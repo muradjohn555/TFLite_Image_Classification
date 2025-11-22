@@ -1,0 +1,7 @@
+0 Pen
+1 Pencil
+2 Stapler
+3 Eraser
+4 Sharpner
+5 Calculator
+6 Compass
