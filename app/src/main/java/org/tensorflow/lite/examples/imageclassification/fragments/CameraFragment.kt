@@ -17,14 +17,19 @@
 package org.tensorflow.lite.examples.imageclassification.fragments
 
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.provider.MediaStore
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.*
 import android.widget.AdapterView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Camera
@@ -67,6 +72,57 @@ class CameraFragment : Fragment(), ImageClassifierHelper.ClassifierListener {
 
     /** Blocking camera operations are performed using this executor */
     private lateinit var cameraExecutor: ExecutorService
+    
+    // ActivityResultLauncher for picking images from gallery
+    private val galleryLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uri = result.data?.data
+            if (uri != null) {
+                // Perform image loading and classification on background thread
+                cameraExecutor.execute {
+                    try {
+                        val inputStream = requireActivity().contentResolver.openInputStream(uri)
+                        val bitmap = BitmapFactory.decodeStream(inputStream)
+                        if (bitmap != null) {
+                            activity?.runOnUiThread {
+                                showImagePreview(bitmap)
+                            }
+                            // Classify the selected image
+                            imageClassifierHelper.classify(bitmap, 0)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error loading image from gallery", e)
+                        activity?.runOnUiThread {
+                            Toast.makeText(requireContext(), "Error loading image", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun showImagePreview(bitmap: Bitmap) {
+        // Pause camera
+        cameraProvider?.unbindAll()
+        
+        // Show image preview
+        fragmentCameraBinding.viewFinder.visibility = View.GONE
+        fragmentCameraBinding.imagePreview.visibility = View.VISIBLE
+        fragmentCameraBinding.imagePreview.setImageBitmap(bitmap)
+        
+        // Show close button
+        fragmentCameraBinding.fabClose.visibility = View.VISIBLE
+    }
+
+    private fun hideImagePreview() {
+        // Hide image preview and close button
+        fragmentCameraBinding.imagePreview.visibility = View.GONE
+        fragmentCameraBinding.fabClose.visibility = View.GONE
+        fragmentCameraBinding.viewFinder.visibility = View.VISIBLE
+        
+        // Restart camera
+        setUpCamera()
+    }
 
     override fun onResume() {
         super.onResume()
@@ -106,12 +162,62 @@ class CameraFragment : Fragment(), ImageClassifierHelper.ClassifierListener {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = classificationResultsAdapter
         }
+        
+        // Pass the labels to the adapter
+        classificationResultsAdapter.setCustomLabels(imageClassifierHelper.labels)
 
         cameraExecutor = Executors.newSingleThreadExecutor()
 
         fragmentCameraBinding.viewFinder.post {
             // Set up the camera and its use cases
             setUpCamera()
+        }
+        
+        // Set up Floating Action Button for Gallery
+        fragmentCameraBinding.fabGallery.setOnClickListener {
+            val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+            galleryLauncher.launch(intent)
+        }
+        
+        // Set up Floating Action Button for Capture
+        fragmentCameraBinding.fabCapture.setOnClickListener {
+             if (::bitmapBuffer.isInitialized) {
+                 // Run on background thread to ensure thread safety for bitmapBuffer 
+                 // and to avoid blocking the UI thread with copy/rotate/classify operations.
+                 cameraExecutor.execute {
+                     // Create a copy of the bitmap to show in preview
+                     // Use a default config if null to be safe
+                     val bitmapCopy = bitmapBuffer.copy(bitmapBuffer.config ?: Bitmap.Config.ARGB_8888, true)
+                     
+                     // We need to rotate it to match screen orientation
+                     val rotation = getScreenOrientation()
+                     val matrix = android.graphics.Matrix()
+                     
+                     // Map rotation index to degrees
+                     val degrees = when(rotation) {
+                         Surface.ROTATION_0 -> 0f
+                         Surface.ROTATION_90 -> 90f
+                         Surface.ROTATION_180 -> 180f
+                         Surface.ROTATION_270 -> 270f
+                         else -> 0f
+                     }
+                     
+                     matrix.postRotate(degrees)
+                     val rotatedBitmap = Bitmap.createBitmap(bitmapCopy, 0, 0, bitmapCopy.width, bitmapCopy.height, matrix, true)
+                     
+                     activity?.runOnUiThread {
+                         showImagePreview(rotatedBitmap)
+                     }
+                     
+                     // Classify
+                     imageClassifierHelper.classify(rotatedBitmap, 0)
+                 }
+             }
+        }
+        
+        // Set up Close button
+        fragmentCameraBinding.fabClose.setOnClickListener {
+            hideImagePreview()
         }
 
         // Attach listeners to UI control widgets

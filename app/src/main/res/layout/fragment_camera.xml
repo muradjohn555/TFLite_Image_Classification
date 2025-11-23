@@ -25,6 +25,47 @@
         android:layout_height="match_parent"
         app:scaleType="fillStart" />
 
+    <ImageView
+        android:id="@+id/image_preview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"
+        android:visibility="gone"
+        android:contentDescription="Image Preview"
+        android:background="@android:color/black"/>
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_gallery"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:contentDescription="Select from Gallery"
+        android:src="@android:drawable/ic_menu_gallery"
+        app:layout_anchor="@id/bottom_sheet_layout"
+        app:layout_anchorGravity="top|end" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_capture"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center"
+        android:layout_margin="16dp"
+        android:contentDescription="Take Picture"
+        android:src="@android:drawable/ic_menu_camera"
+        app:layout_anchor="@id/bottom_sheet_layout"
+        app:layout_anchorGravity="top|center" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_close"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_margin="16dp"
+        android:contentDescription="Close Preview"
+        android:src="@android:drawable/ic_menu_close_clear_cancel"
+        android:visibility="gone" />
+
     <include
         android:id="@+id/bottom_sheet_layout"
         layout="@layout/info_bottom_sheet" />

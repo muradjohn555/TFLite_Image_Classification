@@ -25,10 +25,12 @@ import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.support.image.ImageProcessor
 import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.support.image.ops.Rot90Op
+import org.tensorflow.lite.support.label.Category
 import org.tensorflow.lite.task.core.BaseOptions
 import org.tensorflow.lite.task.core.vision.ImageProcessingOptions
 import org.tensorflow.lite.task.vision.classifier.Classifications
 import org.tensorflow.lite.task.vision.classifier.ImageClassifier
+import java.io.IOException
 
 class ImageClassifierHelper(
     var threshold: Float = 0.5f,
@@ -40,8 +42,11 @@ class ImageClassifierHelper(
     val imageClassifierListener: ClassifierListener?
 ) {
     private var imageClassifier: ImageClassifier? = null
+    var labels: List<String> = emptyList()
+        private set
 
     init {
+        loadLabels()
         setupImageClassifier()
     }
 
@@ -55,6 +60,26 @@ class ImageClassifierHelper(
 
     fun getLabelPath(): String {
         return "converted_tflite_quantized/labels.txt"
+    }
+
+    private fun loadLabels() {
+        try {
+            val labelsList = mutableListOf<String>()
+            context.assets.open(getLabelPath()).bufferedReader().useLines { lines ->
+                lines.forEach { line ->
+                    // Format: "0 Pen" -> we want "Pen"
+                    val parts = line.split(" ", limit = 2)
+                    if (parts.size > 1) {
+                        labelsList.add(parts[1])
+                    } else {
+                        labelsList.add(line)
+                    }
+                }
+            }
+            labels = labelsList
+        } catch (e: IOException) {
+            Log.e(TAG, "Error reading labels", e)
+        }
     }
 
     private fun setupImageClassifier() {
@@ -120,6 +145,7 @@ class ImageClassifierHelper(
             .build()
 
         val results = imageClassifier?.classify(tensorImage, imageProcessingOptions)
+
         inferenceTime = SystemClock.uptimeMillis() - inferenceTime
         imageClassifierListener?.onResults(
             results,

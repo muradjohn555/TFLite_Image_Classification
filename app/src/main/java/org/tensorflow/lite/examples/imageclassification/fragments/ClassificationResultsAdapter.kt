@@ -32,12 +32,17 @@ class ClassificationResultsAdapter :
 
     private var categories: MutableList<Category?> = mutableListOf()
     private var adapterSize: Int = 0
+    private var customLabels: List<String> = emptyList()
+
+    fun setCustomLabels(labels: List<String>) {
+        this.customLabels = labels
+    }
 
     fun updateResults(listClassifications: List<Classifications>?) {
         categories = MutableList(adapterSize) { null }
         listClassifications?.let { it ->
             if (it.isNotEmpty()) {
-                val sortedCategories = it[0].categories.sortedBy { it?.index }
+                val sortedCategories = it[0].categories.sortedByDescending { it?.score }
                 val min = min(sortedCategories.size, categories.size)
                 for (i in 0 until min) {
                     categories[i] = sortedCategories[i]
@@ -61,7 +66,23 @@ class ClassificationResultsAdapter :
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         categories[position].let { category ->
-            holder.bind(category?.label, category?.score)
+            val rawLabel = category?.label
+            val label = if (customLabels.isNotEmpty() && rawLabel != null) {
+                try {
+                    // Try to parse the label as an index (e.g. "0", "1")
+                    val index = rawLabel.toInt()
+                    if (index >= 0 && index < customLabels.size) {
+                        customLabels[index]
+                    } else {
+                        rawLabel
+                    }
+                } catch (e: NumberFormatException) {
+                    rawLabel
+                }
+            } else {
+                rawLabel
+            }
+            holder.bind(label, category?.score)
         }
     }
 
@@ -73,7 +94,14 @@ class ClassificationResultsAdapter :
         fun bind(label: String?, score: Float?) {
             with(binding) {
                 tvLabel.text = label ?: NO_VALUE
-                tvScore.text = if (score != null) String.format("%.2f", score) else NO_VALUE
+                if (score != null) {
+                    val percentage = (score * 100).toInt()
+                    tvScore.text = "$percentage%"
+                    progressBar.progress = percentage
+                } else {
+                    tvScore.text = NO_VALUE
+                    progressBar.progress = 0
+                }
             }
         }
     }
