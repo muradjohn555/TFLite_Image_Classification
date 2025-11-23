@@ -33,9 +33,9 @@ import org.tensorflow.lite.task.vision.classifier.ImageClassifier
 import java.io.IOException
 
 class ImageClassifierHelper(
-    var threshold: Float = 0.5f,
+    var threshold: Float = 0.15f,
     var numThreads: Int = 2,
-    var maxResults: Int = 3,
+    var maxResults: Int = 5,
     var currentDelegate: Int = 0,
     var currentModel: Int = 0,
     val context: Context,
@@ -68,11 +68,11 @@ class ImageClassifierHelper(
             context.assets.open(getLabelPath()).bufferedReader().useLines { lines ->
                 lines.forEach { line ->
                     // Format: "0 Pen" -> we want "Pen"
-                    val parts = line.split(" ", limit = 2)
+                    val parts = line.trim().split(" ", limit = 2)
                     if (parts.size > 1) {
-                        labelsList.add(parts[1])
+                        labelsList.add(parts[1].trim())
                     } else {
-                        labelsList.add(line)
+                        labelsList.add(line.trim())
                     }
                 }
             }
